@@ -28,7 +28,13 @@ class DataPreprocessStrategy(DataStrategy):
         Removes columns which are not required, fills missing values with median average values, and converts the data type to float.
         """
         try:
-            data["F21"].fillna(data["F21"].mode().iloc[0], inplace=True)
+            data['F21'] = data["F21"].fillna(data["F21"].mode().iloc[0])
+            y = data["Class"]
+            X = data.drop("Class", axis=1)
+            sc = StandardScaler()
+            X_scaled = sc.fit_transform(X)
+            X_data= pd.DataFrame(X_scaled, columns=data.columns[:-1])
+            data = pd.concat([X_data, y], axis=1)
         
             return data
         except Exception as e:
@@ -48,9 +54,6 @@ class DataDivideStrategy(DataStrategy):
         try:
             X = data.drop("Class", axis=1)
             y = data["Class"]
-            sc = StandardScaler()
-            X = sc.fit_transform(X)
-            X = pd.DataFrame(X, columns=data.columns[:-1])
             X_train, X_test, y_train, y_test = train_test_split(
                 X, y, test_size=0.2, random_state=42
             )

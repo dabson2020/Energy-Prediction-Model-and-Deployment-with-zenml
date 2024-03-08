@@ -1,4 +1,4 @@
-from pipelines.deploy_pipeline import continuous_deployment_pipeline
+from pipelines.deploy_pipeline import (continuous_deployment_pipeline, inference_pipeline)
 
 from typing import cast
 import click
@@ -8,7 +8,7 @@ from zenml.integrations.mlflow.model_deployers.mlflow_model_deployer import (
     MLFlowModelDeployer,
 )
 from zenml.integrations.mlflow.services import MLFlowDeploymentService
-from pipelines.deploy_pipeline import continuous_deployment_pipeline
+from pipelines.deploy_pipeline import continuous_deployment_pipeline, inference_pipeline
 
 DEPLOY = 'deploy'
 PREDICT = "predict"
@@ -38,12 +38,17 @@ def run_deployment_pipeline(config: str, min_accuracy:float):
     predict = config == PREDICT or config == DEPLOY_AND_PREDICT
     if deploy:
         continuous_deployment_pipeline(
+            data_path="./data/CE802_P2_Test.csv",
             min_accuracy=min_accuracy,
             workers=3,
             timeout=60,)
         
-    """if predict:
-        inference_pipeline()"""
+    if predict:
+        # Initialize an inference pipeline run
+        inference_pipeline(
+            pipeline_name="continuous_deployment_pipeline",
+            pipeline_step_name="mlflow_model_deployer_step",
+        )
     
     print(
         "You can run:\n "

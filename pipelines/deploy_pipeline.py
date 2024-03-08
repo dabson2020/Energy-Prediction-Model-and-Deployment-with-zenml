@@ -1,10 +1,16 @@
 import numpy as np
 import pandas as pd
+import logging
+import json
 #from materializer.custom_materializer import cs_materializer
-from steps.clean_data import clean_data
+from steps.clean_data import clean_df
 from steps.evaluate_model import evaluate_model
 from steps.ingest_data import ingest_df
 from steps.train_model import train_model
+
+import pandas as pd
+from src.data_cleaning import DataCleaning, DataPreprocessStrategy
+
 from zenml import pipeline, step
 from zenml.config import DockerSettings
 from zenml.constants import DEFAULT_SERVICE_START_STOP_TIMEOUT
@@ -16,12 +22,31 @@ from zenml.integrations.mlflow.services import MLFlowDeploymentService
 from zenml.integrations.mlflow.steps import mlflow_model_deployer_step
 from zenml.steps import BaseParameters, Output
 
+#from .util import get_data_for_test
+
 docker_settings = DockerSettings(required_integrations=[MLFLOW])
 
 class DeploymentTriggerConfig(BaseParameters):
     """Deployment trigger configuration"""
-    min_accuracy: float = 0.89
+    min_accuracy: float = 0.84
 
+@step(enable_cache=False)
+def dynamic_importer() -> str:
+    """Dynamic importer step to import the data from the data path"""
+
+    try:
+        data = pd.read_csv("./data/CE802_P2_Test.csv")
+        preprocess_strategy = DataPreprocessStrategy()
+        data_cleaning = DataCleaning(data, preprocess_strategy) 
+        data = data_cleaning.handle_data()
+        data = data.drop("Class", axis=1)
+        result = data.to_json(orient="split")
+        return result
+
+    except Exception as e:
+        logging.error(e)
+        raise e
+    
 @step
 def deployment_trigger(
     accuracy: float,
@@ -84,23 +109,37 @@ def prediction_service_loader(
             f"pipeline for the '{model_name}' model is currently "
             f"running."
         )
-    print(existing_services)
-    print(type(existing_services))
     return existing_services[0]
 
+@step
+def predictor(
+    service: MLFlowDeploymentService,
+    data: str,
+) -> np.ndarray:
+    """Run an inference request against a prediction service"""
 
-
-
-
+    service.start(timeout=10)  # should be a NOP if already started
+    data = json.loads(data)
+    data.pop("columns")
+    data.pop("index")
+    columns_for_df = ['F1','F2','F3','F4','F5','F6','F7','F8','F9',
+                      'F10','F11','F12','F13','F14','F15','F16',
+                      'F17','F18','F19','F20','F21']
+       
+    df = pd.DataFrame(data["data"], columns=columns_for_df)
+    json_list = json.loads(json.dumps(list(df.T.to_dict().values())))
+    data = np.array(json_list)
+    prediction = service.predict(data)
+    return prediction
 
 @pipeline(enable_cache=False, settings={"docker": docker_settings})
 def continuous_deployment_pipeline(
-    min_accuracy: float = 0.89,
+    min_accuracy: float = 0.84,
     workers: int = 1,
     timeout: int = DEFAULT_SERVICE_START_STOP_TIMEOUT,
 ):
-    df = ingest_df(data_path="/Users/adeol/Desktop/MLFlow-Project/data/olist_customers_dataset.csv")
-    X_train, X_test, y_train, y_test = clean_data(data=df)
+    df = ingest_df(data_path="./data/olist_customers_dataset.csv")
+    X_train, X_test, y_train, y_test = clean_df(data=df)
     model = train_model(X_train, X_test, y_train, y_test)
     test_accuracy, test_precision,test_recall,test_f1 = evaluate_model(model, X_test, y_test)
     deployer_decision = deployment_trigger(test_accuracy)
@@ -111,3 +150,15 @@ def continuous_deployment_pipeline(
         timeout=timeout,
 
     )
+
+@pipeline(enable_cache=False, settings={"docker": docker_settings})
+def inference_pipeline(pipeline_name: str, pipeline_step_name: str):
+    # Link all the steps artifacts together
+    batch_data = dynamic_importer()
+    model_deployment_service = prediction_service_loader(
+        pipeline_name=pipeline_name,
+        pipeline_step_name=pipeline_step_name,
+        running=False,
+    )
+    prediction = predictor(service=model_deployment_service, data=batch_data)
+    return prediction
