@@ -1,4 +1,5 @@
-## 1. Energy Prices Prediction in the United Kingdom:
+## 1. Energy Prices Prediction in the United Kingdom
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/zenml)](https://pypi.org/project/zenml/)
 
 Due to inflation, the energy price has increased in the United Kingdom. The government wants to determine the families and individuals who cannot meet this price increase. There are many factors (features) here to determine or predict the inability to meet up with energy prices. These features are categorized into four (4):
   - Temperature: The weather of a day could have a significant effect on the energy consumption by consumers. In winter, the temperature is cold, and to keep warm, energy is consumed through the heating system. During summer, the temperature rises and as such, the use of the heating system is at its minimum or not in use at all. But due to high temperatures, there is a need to drop the temperature by air-conditioning. Both situations may lead to an increase in energy consumption.
@@ -13,31 +14,44 @@ The project is divided into two:
 
 The following processes were considered:
 
-- **Data ingestion/Loading of Data**
-- **Data Cleaning and preprocessing**
-- **Feature Engineering**
-- **Model Development and Prediction**
-  
-  - The data was split into train and test set
-  - The whole data was used for cross-validation with CV = 5. This means that the model will split the data into 5, using 4 folds of the data as training data to train the model and 1 fold as test data to test the model. This will be done five times with different folds as test data. At any point, the test data are different. They help to validate the model and see if the model is generalized and not overfitting or underfitting when unknown (unseen data) is used to test the model.
-  - Nine (9) models were developed which include LGBM, XGB, GradientBoost, Random Forest, Quadratic Discriminant, Linear Discriminant, Logistic Regression, and GaussianNB. 
-  - The model performance was determined with the following metrics:
-    - Accuracy
-    - Precision
-    - Recall
-    - Confusion Matrix
-    - Classification Report
+- **Data ingestion/Loading of Data:** Data is ingested from Azure SQL Database (ingest_data,py)
+- **Data Cleaning and preprocessing:** Data is cleaned and preprocessed (clean_data.py)
+- **Model Development** XGB model is developed with 3 other models (train_model.py)
+- **Model Evaluation** Model is evaluated with accuracy, precision, recall, f1_score (evaluate_model.py)
+- **Model Deployment and Prediction** Model is deployed (run_deployment.py)
+- **Web application**
 
-  The table below displays the performance of each trained model on test data.
-  
-  ![image](https://github.com/dabson2020/Projects-Portfolio/assets/45830157/d1792e76-7645-4b35-a0a9-7a5dade84075)
-  
-  Here is a visual representation of the model performance
-  
-  ![image](https://github.com/dabson2020/Projects-Portfolio/assets/45830157/d657646c-9e04-4ac9-b390-b2f8cb11304d)
+The model building, deployment, and prediction are done with Zenml
 
+## Required modules and libraries
+pip install -r requirements.txt
+**reference to zenml projects:**  git clone https://github.com/zenml-io/zenml-projects.git
+pip install zenml['server']
+zenml init
+zenml up
+**NOTE**
+Before running the `run_deployment.py` script, install the following:
 
-  With the accuracy of 89%, 89% on cross-validation score on test data, and 90.1% accuracy on unknown data, the model with the best performance is the **XGB Classifier**
+zenml integration install mlflow -y
+```
 
-  The model was deployed and predicted with Zenml.
+The project can only be executed with a ZenML stack that has an MLflow experiment tracker and model deployer as a component.
+
+```bash
+zenml integration install mlflow -y
+zenml experiment-tracker register mlflow_tracker --flavor=mlflow
+zenml model-deployer register mlflow --flavor=mlflow
+zenml stack register mlflow_stack -a default -o default -d mlflow -e mlflow_tracker --set
+
+To run the run_pipeline.py use:
+python run_pipeline.py
+
+To run run_deployment.py for deployment
+python run_deployment --config deploy
+
+To run the run_deployment.py for prediction
+python run_deployment --config predict
+
+The XGB Model is deployed with an accuracy of 0.905
+
   
