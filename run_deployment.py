@@ -36,12 +36,12 @@ def run_deployment_pipeline(config: str, min_accuracy:float):
     mlflow_model_deployer_component = MLFlowModelDeployer.get_active_model_deployer()
     deploy = config == DEPLOY or config == DEPLOY_AND_PREDICT
     predict = config == PREDICT or config == DEPLOY_AND_PREDICT
+
     if deploy:
-        continuous_deployment_pipeline(
-            data_path="./data/CE802_P2_Test.csv",
+        continuous_deployment_pipeline(  
             min_accuracy=min_accuracy,
             workers=3,
-            timeout=60,)
+            timeout=60)
         
     if predict:
         # Initialize an inference pipeline run
@@ -65,7 +65,6 @@ def run_deployment_pipeline(config: str, min_accuracy:float):
         pipeline_step_name="mlflow_model_deployer_step",
         model_name="model",
     )
-
     if existing_services:
         service = cast(MLFlowDeploymentService, existing_services[0])
         if service.is_running:

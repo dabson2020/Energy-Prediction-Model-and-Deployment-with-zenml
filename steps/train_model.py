@@ -38,27 +38,30 @@ def train_model(
             lg_model = model.train(X_train, y_train)
             return lg_model
         elif config.model_name == "DecisionTree":
-            mlflow.sklearn.autolog() 
+            mlflow.sklearn.autolog(disable=False) 
             model = DecisionTree()
             dt_model = model.train(X_train, y_train)
             return dt_model
         elif config.model_name == "RandomForest":
-            mlflow.sklearn.autolog() 
+            mlflow.sklearn.autolog(disable=False) 
             model = RandomForest()
             rf_model = model.train(X_train, y_train)
             return rf_model
         elif config.model_name == "GradientBoost":
-            mlflow.sklearn.autolog() 
+            mlflow.sklearn.autolog(disable=False) 
             model = GradientBoost()
             gb_model = model.train(X_train, y_train)
             return gb_model     
         elif config.model_name == "XGB":
-            mlflow.sklearn.autolog() 
+            mlflow.sklearn.autolog(disable=False) 
+            #mlflow.log_model(model, "model")
             model = XGB()
             xgb_model = model.train(X_train, y_train)
             return xgb_model
+            
         else:
             raise ValueError("Model {} not supported".format(config.model_name))
     except Exception as e:
         logging.error(f"Error in training model: {e}")
         return e
+   

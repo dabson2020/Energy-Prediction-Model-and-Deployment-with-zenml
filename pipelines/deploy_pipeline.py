@@ -2,11 +2,14 @@ import numpy as np
 import pandas as pd
 import logging
 import json
+import pypyodbc as odbc
 #from materializer.custom_materializer import cs_materializer
 from steps.clean_data import clean_df
 from steps.evaluate_model import evaluate_model
 from steps.ingest_data import ingest_df
 from steps.train_model import train_model
+from steps.connection import username, password
+
 
 import pandas as pd
 from src.data_cleaning import DataCleaning, DataPreprocessStrategy
@@ -22,7 +25,7 @@ from zenml.integrations.mlflow.services import MLFlowDeploymentService
 from zenml.integrations.mlflow.steps import mlflow_model_deployer_step
 from zenml.steps import BaseParameters, Output
 
-#from .util import get_data_for_test
+from .util import get_data_for_test
 
 docker_settings = DockerSettings(required_integrations=[MLFLOW])
 
@@ -33,19 +36,10 @@ class DeploymentTriggerConfig(BaseParameters):
 @step(enable_cache=False)
 def dynamic_importer() -> str:
     """Dynamic importer step to import the data from the data path"""
+    data = get_data_for_test()
+    return data
 
-    try:
-        data = pd.read_csv("./data/CE802_P2_Test.csv")
-        preprocess_strategy = DataPreprocessStrategy()
-        data_cleaning = DataCleaning(data, preprocess_strategy) 
-        data = data_cleaning.handle_data()
-        data = data.drop("Class", axis=1)
-        result = data.to_json(orient="split")
-        return result
-
-    except Exception as e:
-        logging.error(e)
-        raise e
+    
     
 @step
 def deployment_trigger(
@@ -119,16 +113,16 @@ def predictor(
     """Run an inference request against a prediction service"""
 
     service.start(timeout=10)  # should be a NOP if already started
-    data = json.loads(data)
-    data.pop("columns")
-    data.pop("index")
+    df = json.loads(data)
+    df.pop("columns")
+    df.pop("index")
     columns_for_df = ['F1','F2','F3','F4','F5','F6','F7','F8','F9',
                       'F10','F11','F12','F13','F14','F15','F16',
                       'F17','F18','F19','F20','F21']
        
-    df = pd.DataFrame(data["data"], columns=columns_for_df)
+    df = pd.DataFrame(df["data"], columns=columns_for_df)
     json_list = json.loads(json.dumps(list(df.T.to_dict().values())))
-    data = np.array(json_list)
+    df = np.array(json_list)
     prediction = service.predict(data)
     return prediction
 
@@ -138,10 +132,15 @@ def continuous_deployment_pipeline(
     workers: int = 1,
     timeout: int = DEFAULT_SERVICE_START_STOP_TIMEOUT,
 ):
-    df = ingest_df(data_path="./data/olist_customers_dataset.csv")
-    X_train, X_test, y_train, y_test = clean_df(data=df)
+    server = 'olist-new-server.database.windows.net'
+    database = 'energy_data'
+    connection_string = 'DRIVER={ODBC Driver 18 for SQL Server};SERVER='+server+';DATABASE='+database+';UID='+username+';PWD='+ password
+
+    data = ingest_df(connection_string)
+    X_train, X_test, y_train, y_test =clean_df(data)
     model = train_model(X_train, X_test, y_train, y_test)
-    test_accuracy, test_precision,test_recall,test_f1 = evaluate_model(model, X_test, y_test)
+    test_accuracy, test_precision,test_recall,test_f1=evaluate_model(model, X_test, y_test)
+
     deployer_decision = deployment_trigger(test_accuracy)
     mlflow_model_deployer_step(
         model=model,
